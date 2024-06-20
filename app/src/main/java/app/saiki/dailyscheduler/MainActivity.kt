@@ -20,10 +20,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             DailySchedulerComposeTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    DailySchedule(events = emptyList(), modifier = Modifier.padding(innerPadding))
                 }
             }
         }
