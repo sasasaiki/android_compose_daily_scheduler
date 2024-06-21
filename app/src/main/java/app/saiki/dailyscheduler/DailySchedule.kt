@@ -1,5 +1,6 @@
 package app.saiki.dailyscheduler
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ fun DailySchedule(
     val minuteHeight = 1.dp
 //    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
     val targetHoursCount = 24
+    val overlappingOffsetX = 40.dp
 
     Column(modifier = Modifier.fillMaxHeight()) {
         Text(text = "hoge")
@@ -60,29 +62,24 @@ fun DailySchedule(
         }
     }
     val calenderEvents = @Composable {
-//        val groupedEvent = groupOverlappingEvents(events)
-
-//        groupedEvent.flatMap { it.withIndex() }.map { (index, event) ->
-//            Box(
-//                modifier = Modifier.calenderEventModifier(
-//                    CalendarEventWithOverlappingIndex(
-//                        index,
-//                        event
-//                    )
-//                )
-//            ) {
-//                eventContent(event)
-//            }
-//        }
-
-        events.sortedBy { it.startTime }.forEach { event ->
-            // EventItem固定でいいならBoxなしで直接つけても動く
-            Box(modifier = Modifier.calenderEventModifier(event)) {
-                eventContent(event)
+        val groupedEvent = groupOverlappingEvents(events)
+        val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
+            groupe.mapIndexed { index, event ->
+                CalendarEventWithOverlappingIndex(
+                    index, event
+                )
             }
         }
-    }
 
+        eventsWithOverlappingIndex.forEach { event ->
+            Box(
+                modifier = Modifier.calenderEventModifier(event)
+            ) {
+                eventContent(event.event)
+            }
+
+        }
+    }
 
     val backGroundLines = @Composable {
         repeat(targetHoursCount) {
@@ -134,18 +131,19 @@ fun DailySchedule(
         println("saiki ----------------------------------------")
         println("saiki minuteHeight: ${minuteHeight.roundToPx()}")
         val placeablesWithEvents = eventMeasureables.map { measurable ->
-            val event = measurable.parentData as CalendarEvent
-            val eventDurationMinutes = ChronoUnit.MINUTES.between(event.startTime, event.endTime)
+            val event = measurable.parentData as CalendarEventWithOverlappingIndex
+            val eventDurationMinutes =
+                ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
             val eventHeight = (eventDurationMinutes * minuteHeight.roundToPx()).toInt()
             println("saiki ====================================")
-            println("saiki eventStartTime: ${event.startTime}")
-            println("saiki eventEndTime: ${event.endTime}")
+            println("saiki eventStartTime: ${event.event.startTime}")
+            println("saiki eventEndTime: ${event.event.endTime}")
             println("saiki eventHeight: $eventHeight")
             println("saiki eventDurationMinutes: $eventDurationMinutes")
             println("saiki =======================================")
             val placeable = measurable.measure(
                 constraints.copy(
-                    maxWidth = constraints.maxWidth - labelMaxWidth,
+                    maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.index,
                     minHeight = eventHeight,
                     maxHeight = eventHeight
                 )
@@ -161,17 +159,20 @@ fun DailySchedule(
             }
             placeablesWithEvents.forEach { (placeable, event) ->
                 val timePosY = timeLabelYPositionMap[LocalDateTime.of(
-                    event.startTime.year,
-                    event.startTime.month,
-                    event.startTime.dayOfMonth,
-                    event.startTime.hour,
+                    event.event.startTime.year,
+                    event.event.startTime.month,
+                    event.event.startTime.dayOfMonth,
+                    event.event.startTime.hour,
                     0
                 )] ?: 0
 
-                println("saiki eventStartTime: ${event.startTime}")
-                val eventY = timePosY + event.startTime.minute * minuteHeight.roundToPx()
+                println("saiki eventStartTime: ${event.event.startTime}")
+                val eventY = timePosY + event.event.startTime.minute * minuteHeight.roundToPx()
                 println("saiki eventY: ${eventY}")
-                placeable.place(labelMaxWidth, eventY)
+                placeable.place(
+                    labelMaxWidth + overlappingOffsetX.roundToPx() * event.index,
+                    eventY
+                )
             }
         }
     }
@@ -191,8 +192,9 @@ fun EventItem(
             .cardColors()
             .copy(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            )
+                containerColor = MaterialTheme.colorScheme.primary
+            ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = modifier
@@ -243,7 +245,7 @@ fun Modifier.timeLabelDataModifier(date: LocalDateTime) = this.then(
 
 
 // Parent Data Modifier の作成
-fun Modifier.calenderEventModifier(event: CalendarEvent) = this.then(
+fun Modifier.calenderEventModifier(event: CalendarEventWithOverlappingIndex) = this.then(
     object : ParentDataModifier {
         override fun Density.modifyParentData(parentData: Any?): Any = event
     }
