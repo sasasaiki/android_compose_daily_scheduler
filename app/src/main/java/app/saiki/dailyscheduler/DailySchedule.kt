@@ -21,10 +21,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.math.roundToInt
 
 @Composable
 fun DailySchedule(
@@ -35,15 +33,16 @@ fun DailySchedule(
         EventItem(event = event)
     }
 ) {
-    val hourHeight = 60.dp
-
+    val minuteHeight = 1.dp
+//    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
+    val targetHoursCount = 24
 
     Column(modifier = Modifier.fillMaxHeight()) {
         Text(text = "hoge")
     }
 
     val sideBarTimeLabels = @Composable {
-        repeat(24) { i ->
+        repeat(targetHoursCount) { i ->
             val dateTime = LocalDateTime.of(
                 targetDate.year,
                 targetDate.month,
@@ -61,6 +60,21 @@ fun DailySchedule(
         }
     }
     val calenderEvents = @Composable {
+//        val groupedEvent = groupOverlappingEvents(events)
+
+//        groupedEvent.flatMap { it.withIndex() }.map { (index, event) ->
+//            Box(
+//                modifier = Modifier.calenderEventModifier(
+//                    CalendarEventWithOverlappingIndex(
+//                        index,
+//                        event
+//                    )
+//                )
+//            ) {
+//                eventContent(event)
+//            }
+//        }
+
         events.sortedBy { it.startTime }.forEach { event ->
             // EventItem固定でいいならBoxなしで直接つけても動く
             Box(modifier = Modifier.calenderEventModifier(event)) {
@@ -69,8 +83,20 @@ fun DailySchedule(
         }
     }
 
+
+    val backGroundLines = @Composable {
+        repeat(targetHoursCount) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            )
+        }
+    }
+
     Layout(
         contents = listOf(
+            backGroundLines,
             sideBarTimeLabels,
             calenderEvents,
         ),
@@ -78,36 +104,44 @@ fun DailySchedule(
             .fillMaxHeight()
             .verticalScroll(state = rememberScrollState())
             .background(MaterialTheme.colorScheme.surface),
-    ) { (timeLabelMeasureables, eventMeasureables), constraints ->
+    ) { (backGroundLineMeasureables, timeLabelMeasureables, eventMeasureables), constraints ->
+        val hourHeightPx = minuteHeight.roundToPx() * 60
+
         println("saiki 呼ばれてる？")
-        val totalHeight = hourHeight.roundToPx() * timeLabelMeasureables.size
+        val totalHeight = hourHeightPx * timeLabelMeasureables.size
         var offsetY = 0
-        val yPositionMap = mutableMapOf<LocalDateTime, Int>()
+        val timeLabelYPositionMap = mutableMapOf<LocalDateTime, Int>()
         var labelMaxWidth = 0
-        val placablesTimeLabel = timeLabelMeasureables.map { measurable ->
-            yPositionMap[(measurable.parentData as LocalDateTime)] = offsetY
-            offsetY += hourHeight.roundToPx()
+
+        val placeablesLine = backGroundLineMeasureables.map {
+            val placeable = it.measure(constraints.copy(minHeight = 1, maxHeight = 1))
+            placeable
+        }
+
+        val placablesTimeLabelWithDate = timeLabelMeasureables.map { measurable ->
+            val localDateTime = measurable.parentData as LocalDateTime
+            timeLabelYPositionMap[localDateTime] = offsetY
+            offsetY += hourHeightPx
 
             val placeable = measurable.measure(
-                constraints.copy(
-                    minHeight = hourHeight.roundToPx(),
-                    maxHeight = hourHeight.roundToPx()
-                )
+                constraints
             )
 
             labelMaxWidth = maxOf(labelMaxWidth, placeable.width)
 
-            placeable
+            localDateTime to placeable
         }
-
+        println("saiki ----------------------------------------")
+        println("saiki minuteHeight: ${minuteHeight.roundToPx()}")
         val placeablesWithEvents = eventMeasureables.map { measurable ->
             val event = measurable.parentData as CalendarEvent
             val eventDurationMinutes = ChronoUnit.MINUTES.between(event.startTime, event.endTime)
-            val eventHeight = ((eventDurationMinutes / 60f) * hourHeight.toPx()).roundToInt()
+            val eventHeight = (eventDurationMinutes * minuteHeight.roundToPx()).toInt()
             println("saiki ====================================")
             println("saiki eventStartTime: ${event.startTime}")
             println("saiki eventEndTime: ${event.endTime}")
             println("saiki eventHeight: $eventHeight")
+            println("saiki eventDurationMinutes: $eventDurationMinutes")
             println("saiki =======================================")
             val placeable = measurable.measure(
                 constraints.copy(
@@ -120,13 +154,23 @@ fun DailySchedule(
             Pair(placeable, event)
         }
         layout(constraints.maxWidth, totalHeight) {
-            placablesTimeLabel.forEachIndexed { index, placeable ->
-                placeable.place(0, hourHeight.roundToPx() * index)
+            placablesTimeLabelWithDate.forEachIndexed { index, (dateTime, placeable) ->
+                val offSetY = timeLabelYPositionMap[dateTime] ?: 0
+                placeable.place(0, offSetY)
+                placeablesLine[index].place(0, offSetY)
             }
             placeablesWithEvents.forEach { (placeable, event) ->
-                val eventOffsetMinutes =
-                    ChronoUnit.MINUTES.between(LocalTime.MIN, event.startTime.toLocalTime())
-                val eventY = ((eventOffsetMinutes / 60f) * hourHeight.toPx()).roundToInt()
+                val timePosY = timeLabelYPositionMap[LocalDateTime.of(
+                    event.startTime.year,
+                    event.startTime.month,
+                    event.startTime.dayOfMonth,
+                    event.startTime.hour,
+                    0
+                )] ?: 0
+
+                println("saiki eventStartTime: ${event.startTime}")
+                val eventY = timePosY + event.startTime.minute * minuteHeight.roundToPx()
+                println("saiki eventY: ${eventY}")
                 placeable.place(labelMaxWidth, eventY)
             }
         }
@@ -147,7 +191,7 @@ fun EventItem(
             .cardColors()
             .copy(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
     ) {
         Column(
@@ -205,22 +249,56 @@ fun Modifier.calenderEventModifier(event: CalendarEvent) = this.then(
     }
 )
 
+data class CalendarEventWithOverlappingIndex(
+    val index: Int,
+    val event: CalendarEvent,
+)
+
 data class CalendarEvent(
     val title: String,
     val startTime: LocalDateTime,
     val endTime: LocalDateTime
 )
 
+fun groupOverlappingEvents(events: List<CalendarEvent>): List<List<CalendarEvent>> {
+    if (events.isEmpty()) return emptyList()
+
+    // イベントを開始時間でソートする
+    val sortedEvents = events.sortedBy { it.startTime }
+
+    val groupedEvents = mutableListOf<MutableList<CalendarEvent>>()
+    var currentGroup = mutableListOf<CalendarEvent>()
+    currentGroup.add(sortedEvents[0])
+
+    for (i in 1 until sortedEvents.size) {
+        val currentEvent = sortedEvents[i]
+        val lastEventInGroup = currentGroup.last()
+
+        if (currentEvent.startTime < lastEventInGroup.endTime) {
+            // イベントが重なっている場合、現在のグループに追加
+            currentGroup.add(currentEvent)
+        } else {
+            // 重ならない場合、新しいグループを作成
+            groupedEvents.add(currentGroup)
+            currentGroup = mutableListOf()
+            currentGroup.add(currentEvent)
+        }
+    }
+
+    // 最後のグループを追加
+    groupedEvents.add(currentGroup)
+
+    return groupedEvents
+}
+
+
 @Preview
 @Composable
 private fun PreviewDaily() {
     DailySchedule(
-        events = listOf(
-            CalendarEvent(
-                title = "Event Title",
-                startTime = LocalDateTime.now(),
-                endTime = LocalDateTime.now().plusHours(1)
-            )
+        events =
+        createDummyEvent(
+            LocalDateTime.now()
         )
     )
 }

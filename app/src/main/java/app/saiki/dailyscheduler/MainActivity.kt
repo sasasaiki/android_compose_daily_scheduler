@@ -57,6 +57,41 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
                 targetDateTime.year,
                 targetDateTime.month,
                 targetDateTime.dayOfMonth,
+                10,
+                0
+            ),
+            endTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                11,
+                0
+            ),
+            title = "完全に重なる",
+        ),
+
+        CalendarEvent(
+            startTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                10,
+                30
+            ),
+            endTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                11,
+                0
+            ),
+            title = "ちょっと重なる",
+        ),
+        CalendarEvent(
+            startTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
                 11,
                 0
             ),
@@ -64,11 +99,30 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
                 targetDateTime.year,
                 targetDateTime.month,
                 targetDateTime.dayOfMonth,
-                13,
+                12,
                 0
             ),
             title = "Meeting",
-        ), CalendarEvent(
+        ),
+
+        CalendarEvent(
+            startTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                12,
+                0
+            ),
+            endTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                12,
+                30
+            ),
+            title = "Meeting",
+        ),
+        CalendarEvent(
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
