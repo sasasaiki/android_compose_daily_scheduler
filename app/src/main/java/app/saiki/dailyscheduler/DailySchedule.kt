@@ -2,6 +2,9 @@ package app.saiki.dailyscheduler
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation.*
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,6 +18,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
@@ -24,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 @Composable
 fun DailySchedule(
@@ -34,6 +43,8 @@ fun DailySchedule(
         EventItem(event = event)
     }
 ) {
+    println("saiki composition 呼ばれすぎてない？")
+
     val minuteHeight = 1.dp
 //    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
     val targetHoursCount = 24
@@ -61,6 +72,15 @@ fun DailySchedule(
             }
         }
     }
+
+    var currentDraggingEvent: CalendarEvent? by remember {
+        mutableStateOf(null)
+    }
+    var yOffset: Float by remember {
+        mutableFloatStateOf(0f)
+    }
+
+
     val calenderEvents = @Composable {
         val groupedEvent = groupOverlappingEvents(events)
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
@@ -71,11 +91,25 @@ fun DailySchedule(
             }
         }
 
-        eventsWithOverlappingIndex.forEach { event ->
+        eventsWithOverlappingIndex.forEach { wrappedEvent ->
             Box(
-                modifier = Modifier.calenderEventModifier(event)
+                modifier = Modifier
+                    .calenderEventModifier(wrappedEvent)
+                    .draggable(
+                        state = rememberDraggableState { delta ->
+                            yOffset += delta
+                        },
+                        onDragStarted = {
+                            currentDraggingEvent = wrappedEvent.event// TODO id持たせる
+                        },
+                        onDragStopped = {
+                            currentDraggingEvent = null
+                            yOffset = 0f
+                        },
+                        orientation = Vertical
+                    )
             ) {
-                eventContent(event.event)
+                eventContent(wrappedEvent.event)
             }
 
         }
@@ -104,7 +138,7 @@ fun DailySchedule(
     ) { (backGroundLineMeasureables, timeLabelMeasureables, eventMeasureables), constraints ->
         val hourHeightPx = minuteHeight.roundToPx() * 60
 
-        println("saiki 呼ばれてる？")
+        println("saiki measure 呼ばれすぎてない？")
         val totalHeight = hourHeightPx * timeLabelMeasureables.size
         var offsetY = 0
         val timeLabelYPositionMap = mutableMapOf<LocalDateTime, Int>()
@@ -129,7 +163,6 @@ fun DailySchedule(
             localDateTime to placeable
         }
         println("saiki ----------------------------------------")
-        println("saiki minuteHeight: ${minuteHeight.roundToPx()}")
         val placeablesWithEvents = eventMeasureables.map { measurable ->
             val event = measurable.parentData as CalendarEventWithOverlappingIndex
             val eventDurationMinutes =
@@ -166,12 +199,18 @@ fun DailySchedule(
                     0
                 )] ?: 0
 
-                println("saiki eventStartTime: ${event.event.startTime}")
                 val eventY = timePosY + event.event.startTime.minute * minuteHeight.roundToPx()
-                println("saiki eventY: ${eventY}")
+
+                val (dragOffsetY, zIndex) = if (currentDraggingEvent == event.event) {
+                    yOffset to 1f
+                } else {
+                    0f to 0f
+                }
+
                 placeable.place(
-                    labelMaxWidth + overlappingOffsetX.roundToPx() * event.index,
-                    eventY
+                    x = labelMaxWidth + overlappingOffsetX.roundToPx() * event.index,
+                    y = eventY + dragOffsetY.roundToInt(),
+                    zIndex = zIndex
                 )
             }
         }
@@ -262,6 +301,23 @@ data class CalendarEvent(
     val startTime: LocalDateTime,
     val endTime: LocalDateTime
 )
+
+interface PrimitiveCalenderEvent {
+    val id: EventId
+    val startTime: LocalDateTime
+    val endTime: LocalDateTime
+    val group: Group
+    val isDragging: Boolean
+
+    data class Group(
+        val index: Int,
+        val size: Int
+    )
+}
+
+@JvmInline
+value class EventId(val value: String)
+
 
 fun groupOverlappingEvents(events: List<CalendarEvent>): List<List<CalendarEvent>> {
     if (events.isEmpty()) return emptyList()
