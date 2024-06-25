@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
                     DailySchedule(
                         targetDate = targetDateTime,
                         events = createDummyEvent(targetDateTime),
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
                     )
                 }
             }
@@ -33,9 +33,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// これはよその持ち物
+data class CalendarEvent(
+    val title: String,
+    override val id: EventId,
+    override val startTime: LocalDateTime,
+    override val endTime: LocalDateTime
+) : PrimitiveCalenderEvent
+
 fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
     return listOf(
         CalendarEvent(
+            id = EventId("0"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -53,6 +62,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
             title = "Meeting",
         ),
         CalendarEvent(
+            id = EventId("1"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -71,6 +81,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
         ),
 
         CalendarEvent(
+            id = EventId("2"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -88,6 +99,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
             title = "ちょっと重なる",
         ),
         CalendarEvent(
+            id = EventId("3"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -106,6 +118,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
         ),
 
         CalendarEvent(
+            id = EventId("4"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -123,6 +136,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
             title = "Meeting",
         ),
         CalendarEvent(
+            id = EventId("5"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,
@@ -140,6 +154,7 @@ fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
             title = "Meeting",
         ),
         CalendarEvent(
+            id = EventId("6"),
             startTime = LocalDateTime.of(
                 targetDateTime.year,
                 targetDateTime.month,

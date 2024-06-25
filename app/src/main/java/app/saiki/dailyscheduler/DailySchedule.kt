@@ -38,10 +38,8 @@ import kotlin.math.roundToInt
 fun DailySchedule(
     modifier: Modifier = Modifier,
     targetDate: LocalDateTime = LocalDateTime.now(),
-    events: List<CalendarEvent>,
-    eventContent: @Composable (CalendarEvent) -> Unit = { event ->
-        EventItem(event = event)
-    }
+    events: List<PrimitiveCalenderEvent>,
+    eventContent: @Composable (PrimitiveCalenderEvent) -> Unit = { StandardEventItem(event = it) }
 ) {
     println("saiki composition 呼ばれすぎてない？")
 
@@ -68,12 +66,12 @@ fun DailySchedule(
                     dateTime
                 )
             ) {
-                SidebarTimeLabel(dateTime)
+                StandardSidebarTimeLabel(dateTime)
             }
         }
     }
 
-    var currentDraggingEvent: CalendarEvent? by remember {
+    var currentDraggingEvent: PrimitiveCalenderEvent? by remember {
         mutableStateOf(null)
     }
     var yOffset: Float by remember {
@@ -86,7 +84,9 @@ fun DailySchedule(
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
                 CalendarEventWithOverlappingIndex(
-                    index, groupe.size, event
+                    group = CalendarEventWithOverlappingIndex.Group(index, groupe.size),
+                    isDragging = false,
+                    event = event
                 )
             }
         }
@@ -176,7 +176,7 @@ fun DailySchedule(
             println("saiki =======================================")
             val placeable = measurable.measure(
                 constraints.copy(
-                    maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.index - (event.groupSize - 1 - event.index) * overlappingOffsetX.roundToPx(),
+                    maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.group.index - (event.group.size - 1 - event.group.index) * overlappingOffsetX.roundToPx(),
                     minHeight = eventHeight,
                     maxHeight = eventHeight
                 )
@@ -208,7 +208,7 @@ fun DailySchedule(
                 }
 
                 placeable.place(
-                    x = labelMaxWidth + overlappingOffsetX.roundToPx() * event.index,
+                    x = labelMaxWidth + overlappingOffsetX.roundToPx() * event.group.index,
                     y = eventY + dragOffsetY.roundToInt(),
                     zIndex = zIndex
                 )
@@ -219,9 +219,65 @@ fun DailySchedule(
 
 
 @Composable
-fun EventItem(
+fun StandardSidebarTimeLabel(
+    time: LocalDateTime,
     modifier: Modifier = Modifier,
-    event: CalendarEvent
+) {
+    Text(
+        modifier = modifier
+            .padding(4.dp),
+        text = time.format(HourLabelFormatter),
+    )
+}
+
+val EventTimeFormatter = DateTimeFormatter.ofPattern("d:HH:mm")
+val HourLabelFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+// Parent Data の定義
+class TimeLabelDataModifier(val date: LocalDateTime) : ParentDataModifier {
+    override fun Density.modifyParentData(parentData: Any?): Any {
+        return date
+    }
+}
+
+// Parent Data Modifier の作成
+fun Modifier.timeLabelDataModifier(date: LocalDateTime) = this.then(
+    TimeLabelDataModifier(date)
+)
+
+
+// Parent Data Modifier の作成
+fun Modifier.calenderEventModifier(event: CalendarEventWithOverlappingIndex) = this.then(
+    object : ParentDataModifier {
+        override fun Density.modifyParentData(parentData: Any?): Any = event
+    }
+)
+
+data class CalendarEventWithOverlappingIndex(
+    val group: Group,
+    val isDragging: Boolean,
+    val event: PrimitiveCalenderEvent,
+) {
+    data class Group(
+        val index: Int,
+        val size: Int
+    )
+}
+
+interface PrimitiveCalenderEvent {
+    val id: EventId
+    val startTime: LocalDateTime
+    val endTime: LocalDateTime
+}
+
+@JvmInline
+value class EventId(val value: String)
+
+
+@Composable
+private fun StandardEventItem(
+    modifier: Modifier = Modifier,
+    event: PrimitiveCalenderEvent
 ) {
     Card(
         modifier = Modifier
@@ -248,85 +304,21 @@ fun EventItem(
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(
-                text = "Event Title",
+                text = event.id.value,
                 style = MaterialTheme.typography.titleSmall
             )
         }
     }
 }
 
-@Composable
-fun SidebarTimeLabel(
-    time: LocalDateTime,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        modifier = Modifier
-            .padding(4.dp),
-        text = time.format(HourLabelFormatter),
-    )
-}
-
-private val EventTimeFormatter = DateTimeFormatter.ofPattern("d:HH:mm")
-private val HourLabelFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
-// Parent Data の定義
-class TimeLabelDataModifier(val date: LocalDateTime) : ParentDataModifier {
-    override fun Density.modifyParentData(parentData: Any?): Any {
-        return date
-    }
-}
-
-// Parent Data Modifier の作成
-fun Modifier.timeLabelDataModifier(date: LocalDateTime) = this.then(
-    TimeLabelDataModifier(date)
-)
-
-
-// Parent Data Modifier の作成
-fun Modifier.calenderEventModifier(event: CalendarEventWithOverlappingIndex) = this.then(
-    object : ParentDataModifier {
-        override fun Density.modifyParentData(parentData: Any?): Any = event
-    }
-)
-
-data class CalendarEventWithOverlappingIndex(
-    val index: Int,
-    val groupSize: Int,
-    val event: CalendarEvent,
-)
-
-data class CalendarEvent(
-    val title: String,
-    val startTime: LocalDateTime,
-    val endTime: LocalDateTime
-)
-
-interface PrimitiveCalenderEvent {
-    val id: EventId
-    val startTime: LocalDateTime
-    val endTime: LocalDateTime
-    val group: Group
-    val isDragging: Boolean
-
-    data class Group(
-        val index: Int,
-        val size: Int
-    )
-}
-
-@JvmInline
-value class EventId(val value: String)
-
-
-fun groupOverlappingEvents(events: List<CalendarEvent>): List<List<CalendarEvent>> {
+fun groupOverlappingEvents(events: List<PrimitiveCalenderEvent>): List<List<PrimitiveCalenderEvent>> {
     if (events.isEmpty()) return emptyList()
 
     // イベントを開始時間でソートする
     val sortedEvents = events.sortedBy { it.startTime }
 
-    val groupedEvents = mutableListOf<MutableList<CalendarEvent>>()
-    var currentGroup = mutableListOf<CalendarEvent>()
+    val groupedEvents = mutableListOf<MutableList<PrimitiveCalenderEvent>>()
+    var currentGroup = mutableListOf<PrimitiveCalenderEvent>()
     currentGroup.add(sortedEvents[0])
 
     for (i in 1 until sortedEvents.size) {
@@ -365,17 +357,17 @@ private fun PreviewDaily() {
 @Preview
 @Composable
 private fun PreviewEvent() {
-    EventItem(
-        event = CalendarEvent(
-            title = "Event Title",
-            startTime = LocalDateTime.now(),
-            endTime = LocalDateTime.now().plusHours(1)
-        )
+    StandardEventItem(
+        event = object : PrimitiveCalenderEvent {
+            override val id = EventId("0")
+            override val startTime = LocalDateTime.now()
+            override val endTime = LocalDateTime.now().plusHours(1)
+        }
     )
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun PreviewTimeLabel() {
-    SidebarTimeLabel(LocalDateTime.now())
+    StandardSidebarTimeLabel(LocalDateTime.now())
 }
