@@ -66,7 +66,7 @@ fun DailySchedule(
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
                 CalendarEventWithOverlappingIndex(
-                    index, event
+                    index, groupe.size, event
                 )
             }
         }
@@ -143,7 +143,7 @@ fun DailySchedule(
             println("saiki =======================================")
             val placeable = measurable.measure(
                 constraints.copy(
-                    maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.index,
+                    maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.index - (event.groupCount - event.index) * overlappingOffsetX.roundToPx(),
                     minHeight = eventHeight,
                     maxHeight = eventHeight
                 )
@@ -253,6 +253,7 @@ fun Modifier.calenderEventModifier(event: CalendarEventWithOverlappingIndex) = t
 
 data class CalendarEventWithOverlappingIndex(
     val index: Int,
+    val groupCount: Int,
     val event: CalendarEvent,
 )
 
