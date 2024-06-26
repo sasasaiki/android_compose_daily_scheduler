@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.math.roundToInt
 
 @Composable
 fun DailySchedule(
@@ -43,10 +42,10 @@ fun DailySchedule(
 ) {
     println("saiki composition 呼ばれすぎてない？")
 
-    val minuteHeight = 1.dp
+    val minuteHeight = 2.dp
 //    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
     val targetHoursCount = 24
-    val overlappingOffsetX = 40.dp
+    val overlappingOffsetX = 40.dp // 重なりがある場合にどれくらいずらすか
 
     Column(modifier = Modifier.fillMaxHeight()) {
         Text(text = "hoge")
@@ -137,6 +136,7 @@ fun DailySchedule(
             .background(MaterialTheme.colorScheme.surface),
     ) { (backGroundLineMeasureables, timeLabelMeasureables, eventMeasureables), constraints ->
         val hourHeightPx = minuteHeight.roundToPx() * 60
+        val fifteenMinutePx = minuteHeight.roundToPx() * 15
 
         println("saiki measure 呼ばれすぎてない？")
         val totalHeight = hourHeightPx * timeLabelMeasureables.size
@@ -191,13 +191,8 @@ fun DailySchedule(
                 placeablesLine[index].place(0, offSetY)
             }
             placeablesWithEvents.forEach { (placeable, event) ->
-                val timePosY = timeLabelYPositionMap[LocalDateTime.of(
-                    event.event.startTime.year,
-                    event.event.startTime.month,
-                    event.event.startTime.dayOfMonth,
-                    event.event.startTime.hour,
-                    0
-                )] ?: 0
+                val timePosY =
+                    timeLabelYPositionMap[getZeroMinuteLocalDateTime(event.event.startTime)] ?: 0
 
                 val eventY = timePosY + event.event.startTime.minute * minuteHeight.roundToPx()
 
@@ -207,9 +202,18 @@ fun DailySchedule(
                     0f to 0f
                 }
 
+                val lastOffsetY = if (dragOffsetY != 0f) {
+                    val offsetMinutes = dragOffsetY / minuteHeight.roundToPx()
+                    val targetTime = event.event.startTime.plusMinutes(offsetMinutes.toLong())
+                    val timeY = timeLabelYPositionMap[getZeroMinuteLocalDateTime(targetTime)] ?: 0
+                    findClosestFiveMinute(targetTime) * minuteHeight.roundToPx() + timeY
+                } else {
+                    eventY
+                }
+
                 placeable.place(
                     x = labelMaxWidth + overlappingOffsetX.roundToPx() * event.group.index,
-                    y = eventY + dragOffsetY.roundToInt(),
+                    y = lastOffsetY,//eventY + dragOffsetY.roundToInt(),
                     zIndex = zIndex
                 )
             }
@@ -217,6 +221,25 @@ fun DailySchedule(
     }
 }
 
+private fun getZeroMinuteLocalDateTime(time: LocalDateTime): LocalDateTime? =
+    LocalDateTime.of(
+        time.year,
+        time.month,
+        time.dayOfMonth,
+        time.hour,
+        0
+    )
+
+private fun findClosestFiveMinute(dateTime: LocalDateTime): Int {
+    val minute = dateTime.minute
+    val tickMinutes = 5
+    val remainder = minute % tickMinutes
+    return if (remainder < tickMinutes / 2 + 1) {
+        minute - remainder
+    } else {
+        minute + (tickMinutes - remainder)
+    }
+}
 
 @Composable
 fun StandardSidebarTimeLabel(
