@@ -9,9 +9,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import app.saiki.dailyscheduler.ui.theme.DailySchedulerComposeTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 class MainActivity : ComponentActivity() {
@@ -19,13 +26,34 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val targetDateTime = LocalDateTime.now()
+
         setContent {
             DailySchedulerComposeTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+
+                    val scope = rememberCoroutineScope()
+
+                    var list by remember {
+                        mutableStateOf(
+                            createDummyEvent(targetDateTime)
+                        )
+                    }
                     DailySchedule(
                         targetDate = targetDateTime,
-                        events = createDummyEvent(targetDateTime),
+                        events = list,
                         modifier = Modifier.padding(innerPadding),
+                        onFinishDragEvent = { event, targetTime ->
+                            list = list.map {
+                                if (event.id == it.id) {
+                                    it.copy(
+                                        startTime = targetTime.startTime,
+                                        endTime = targetTime.endTime
+                                    )
+                                } else {
+                                    it
+                                }
+                            }
+                        }
                     )
                 }
             }

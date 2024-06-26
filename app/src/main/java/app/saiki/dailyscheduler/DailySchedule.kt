@@ -38,7 +38,12 @@ fun DailySchedule(
     modifier: Modifier = Modifier,
     targetDate: LocalDateTime = LocalDateTime.now(),
     events: List<PrimitiveCalenderEvent>,
-    eventContent: @Composable (PrimitiveCalenderEvent) -> Unit = { StandardEventItem(event = it) }
+    eventContent: @Composable (CalendarEventWithOverlappingIndex) -> Unit = {
+        StandardEventItem(
+            event = it
+        )
+    },
+    onFinishDragEvent: (targetEvent: PrimitiveCalenderEvent, expectedTime: ExpectedTime) -> Unit
 ) {
     println("saiki composition 呼ばれすぎてない？")
 
@@ -77,8 +82,8 @@ fun DailySchedule(
         mutableFloatStateOf(0f)
     }
 
-
-    val calenderEvents = @Composable {
+    var eventsWithOverlappingIndex by remember(events) {
+        println("saiki rememberの中動くよね？")
         val groupedEvent = groupOverlappingEvents(events)
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
@@ -89,6 +94,12 @@ fun DailySchedule(
                 )
             }
         }
+        mutableStateOf(
+            eventsWithOverlappingIndex
+        )
+    }
+
+    val calenderEvents = @Composable {
 
         eventsWithOverlappingIndex.forEach { wrappedEvent ->
             Box(
@@ -99,16 +110,34 @@ fun DailySchedule(
                             yOffset += delta
                         },
                         onDragStarted = {
-                            currentDraggingEvent = wrappedEvent.event// TODO id持たせる
+                            currentDraggingEvent = wrappedEvent.event
+                            eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                                if (it.event == wrappedEvent.event) {
+                                    println("saiki onDragStopped and set true")
+                                    it.copy(isDragging = true)
+                                } else {
+                                    it
+                                }
+                            }
                         },
                         onDragStopped = {
                             currentDraggingEvent = null
                             yOffset = 0f
+                            eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                                if (it.isDragging) {
+                                    println("saiki onDragStopped and reset")
+                                    it.copy(isDragging = false, expectedTime = null)
+                                } else {
+                                    it
+                                }
+                            }
+
+                            onFinishDragEvent(wrappedEvent.event, wrappedEvent.expectedTime!!)
                         },
                         orientation = Vertical
                     )
             ) {
-                eventContent(wrappedEvent.event)
+                eventContent(wrappedEvent)
             }
 
         }
@@ -136,7 +165,6 @@ fun DailySchedule(
             .background(MaterialTheme.colorScheme.surface),
     ) { (backGroundLineMeasureables, timeLabelMeasureables, eventMeasureables), constraints ->
         val hourHeightPx = minuteHeight.roundToPx() * 60
-        val fifteenMinutePx = minuteHeight.roundToPx() * 15
 
         println("saiki measure 呼ばれすぎてない？")
         val totalHeight = hourHeightPx * timeLabelMeasureables.size
@@ -205,15 +233,39 @@ fun DailySchedule(
                 val lastOffsetY = if (dragOffsetY != 0f) {
                     val offsetMinutes = dragOffsetY / minuteHeight.roundToPx()
                     val targetTime = event.event.startTime.plusMinutes(offsetMinutes.toLong())
-                    val timeY = timeLabelYPositionMap[getZeroMinuteLocalDateTime(targetTime)] ?: 0
-                    findClosestFiveMinute(targetTime) * minuteHeight.roundToPx() + timeY
+                    val targetZeroTime = getZeroMinuteLocalDateTime(targetTime)
+                    val timeY = timeLabelYPositionMap[targetZeroTime] ?: 0
+
+                    val closestFiveMinute = findClosestFiveMinute(targetTime)
+
+                    val targetStartTime = targetZeroTime.plusMinutes(closestFiveMinute.toLong())
+                    val duration =
+                        ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
+
+                    eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                        if (it == event) {
+                            println("saiki set expectedTime in placeable")
+                            it.copy(
+                                expectedTime = ExpectedTime(
+                                    startTime = targetStartTime,
+                                    endTime = targetStartTime.plusMinutes(duration)
+                                )
+                            )
+                        } else {
+                            it
+                        }
+                    }
+
+                    closestFiveMinute * minuteHeight.roundToPx() + timeY
+
+
                 } else {
                     eventY
                 }
 
                 placeable.place(
                     x = labelMaxWidth + overlappingOffsetX.roundToPx() * event.group.index,
-                    y = lastOffsetY,//eventY + dragOffsetY.roundToInt(),
+                    y = lastOffsetY,
                     zIndex = zIndex
                 )
             }
@@ -221,7 +273,7 @@ fun DailySchedule(
     }
 }
 
-private fun getZeroMinuteLocalDateTime(time: LocalDateTime): LocalDateTime? =
+private fun getZeroMinuteLocalDateTime(time: LocalDateTime): LocalDateTime =
     LocalDateTime.of(
         time.year,
         time.month,
@@ -278,7 +330,8 @@ fun Modifier.calenderEventModifier(event: CalendarEventWithOverlappingIndex) = t
 
 data class CalendarEventWithOverlappingIndex(
     val group: Group,
-    val isDragging: Boolean,
+    val isDragging: Boolean, //TODO timeと合わせてStateに
+    val expectedTime: ExpectedTime? = null, // ドラッグ位置に対応した時刻
     val event: PrimitiveCalenderEvent,
 ) {
     data class Group(
@@ -286,6 +339,11 @@ data class CalendarEventWithOverlappingIndex(
         val size: Int
     )
 }
+
+data class ExpectedTime(
+    val startTime: LocalDateTime,
+    val endTime: LocalDateTime
+)
 
 interface PrimitiveCalenderEvent {
     val id: EventId
@@ -300,8 +358,11 @@ value class EventId(val value: String)
 @Composable
 private fun StandardEventItem(
     modifier: Modifier = Modifier,
-    event: PrimitiveCalenderEvent
+    event: CalendarEventWithOverlappingIndex
 ) {
+    if (event.event.id == EventId("5")) {
+        println("saiki 5 ${event.isDragging}")
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -310,7 +371,11 @@ private fun StandardEventItem(
             .cardColors()
             .copy(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = if (event.isDragging) {
+                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
             ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f))
     ) {
@@ -318,21 +383,29 @@ private fun StandardEventItem(
             modifier = modifier
                 .padding(8.dp)
         ) {
+            val (startTime, endTime) = if (event.expectedTime != null) {
+                event.expectedTime.startTime to event.expectedTime.endTime
+            } else {
+                event.event.startTime to event.event.endTime
+            }
             Text(
-                text = "${event.startTime.format(EventTimeFormatter)} - ${
-                    event.endTime.format(
-                        EventTimeFormatter
-                    )
-                }",
+                text = createTimeText(startTime, endTime),
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(
-                text = event.id.value,
+                text = event.event.id.value,
                 style = MaterialTheme.typography.titleSmall
             )
         }
     }
 }
+
+private fun createTimeText(startTime: LocalDateTime, endTime: LocalDateTime) =
+    "${startTime.format(EventTimeFormatter)} - ${
+        endTime.format(
+            EventTimeFormatter
+        )
+    }"
 
 fun groupOverlappingEvents(events: List<PrimitiveCalenderEvent>): List<List<PrimitiveCalenderEvent>> {
     if (events.isEmpty()) return emptyList()
@@ -373,7 +446,8 @@ private fun PreviewDaily() {
         events =
         createDummyEvent(
             LocalDateTime.now()
-        )
+        ),
+        onFinishDragEvent = { _, _ -> }
     )
 }
 
@@ -381,11 +455,14 @@ private fun PreviewDaily() {
 @Composable
 private fun PreviewEvent() {
     StandardEventItem(
-        event = object : PrimitiveCalenderEvent {
-            override val id = EventId("0")
-            override val startTime = LocalDateTime.now()
-            override val endTime = LocalDateTime.now().plusHours(1)
-        }
+        event = CalendarEventWithOverlappingIndex(
+            group = CalendarEventWithOverlappingIndex.Group(0, 1),
+            isDragging = false,
+            event = object : PrimitiveCalenderEvent {
+                override val id = EventId("0")
+                override val startTime = LocalDateTime.now()
+                override val endTime = LocalDateTime.now().plusHours(1)
+            })
     )
 }
 
