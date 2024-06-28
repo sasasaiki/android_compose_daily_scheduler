@@ -355,6 +355,8 @@ interface PrimitiveCalenderEvent {
 value class EventId(val value: String)
 
 
+//　これ入れないとドラッグ中全員が描画されるので注意
+// https://developer.android.com/develop/ui/compose/performance/stability/fix#kotlin
 @Composable
 private fun StandardEventItem(
     modifier: Modifier = Modifier,
