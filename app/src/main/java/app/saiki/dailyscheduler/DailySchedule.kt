@@ -37,6 +37,7 @@ import java.time.temporal.ChronoUnit
 fun DailySchedule(
     modifier: Modifier = Modifier,
     targetDate: LocalDateTime = LocalDateTime.now(),
+    daysCount: Int = 1,
     events: List<PrimitiveCalenderEvent>,
     eventContent: @Composable (CalendarEventWithOverlappingIndex) -> Unit = {
         StandardEventItem(
@@ -49,20 +50,22 @@ fun DailySchedule(
 
     val minuteHeight = 2.dp
 //    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
-    val targetHoursCount = 24
+    val targetHoursCount = 24 * daysCount
     val overlappingOffsetX = 40.dp // 重なりがある場合にどれくらいずらすか
 
     Column(modifier = Modifier.fillMaxHeight()) {
         Text(text = "hoge")
     }
 
+
     val sideBarTimeLabels = @Composable {
         repeat(targetHoursCount) { i ->
+            val hoge = targetDate.plusDays((i/24).toLong())
             val dateTime = LocalDateTime.of(
-                targetDate.year,
-                targetDate.month,
-                targetDate.dayOfMonth,
-                i,
+                hoge.year,
+                hoge.month,
+                hoge.dayOfMonth,
+                i%24,
                 0
             )
             Box(

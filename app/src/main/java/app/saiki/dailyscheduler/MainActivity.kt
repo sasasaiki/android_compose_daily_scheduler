@@ -35,12 +35,14 @@ class MainActivity : ComponentActivity() {
 
                     var list by remember {
                         mutableStateOf(
-                            createDummyEvent(targetDateTime)
+//                            createDummyEvent(targetDateTime)
+                            createDummyEvents()
                         )
                     }
                     DailySchedule(
                         targetDate = targetDateTime,
                         events = list,
+                        daysCount = 365,
                         modifier = Modifier.padding(innerPadding),
                         onFinishDragEvent = { event, targetTime ->
                             list = list.map {
@@ -69,6 +71,11 @@ data class CalendarEvent(
     override val endTime: LocalDateTime
 ) : PrimitiveCalenderEvent
 
+fun createDummyEvents(): List<CalendarEvent> {
+    return List(365) {
+        createDummyEvent(LocalDateTime.now().plusDays(it.toLong()))
+    }.flatten()
+}
 fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
     return listOf(
         CalendarEvent(
