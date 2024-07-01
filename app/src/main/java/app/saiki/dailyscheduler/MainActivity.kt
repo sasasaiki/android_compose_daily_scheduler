@@ -35,14 +35,14 @@ class MainActivity : ComponentActivity() {
 
                     var list by remember {
                         mutableStateOf(
-//                            createDummyEvent(targetDateTime)
-                            createDummyEvents()
+                            createDummyEvent(targetDateTime)
+//                            createDummyEvents()
                         )
                     }
                     DailySchedule(
                         targetDate = targetDateTime,
                         events = list,
-                        daysCount = 365,
+                        daysCount = 1,
                         modifier = Modifier.padding(innerPadding),
                         onFinishDragEvent = { event, targetTime ->
                             list = list.map {

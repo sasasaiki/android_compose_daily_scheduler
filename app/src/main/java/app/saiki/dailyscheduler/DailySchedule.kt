@@ -57,17 +57,15 @@ fun DailySchedule(
         Text(text = "hoge")
     }
 
-
     val sideBarTimeLabels = @Composable {
         repeat(targetHoursCount) { i ->
-            val hoge = targetDate.plusDays((i/24).toLong())
             val dateTime = LocalDateTime.of(
-                hoge.year,
-                hoge.month,
-                hoge.dayOfMonth,
-                i%24,
+                targetDate.year,
+                targetDate.month,
+                targetDate.dayOfMonth,
+                0,
                 0
-            )
+            ).plusHours(i.toLong())
             Box(
                 modifier = Modifier.timeLabelDataModifier(
                     dateTime
