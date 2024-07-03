@@ -184,12 +184,11 @@ fun DailySchedule(
     }
 
     val backGroundLines = @Composable {
-        showedTimeLabel.forEach {
+        repeat(50) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    .timeLabelDataModifier(it)
             )
         }
     }
