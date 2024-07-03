@@ -35,8 +35,8 @@ class MainActivity : ComponentActivity() {
 
                     var list by remember {
                         mutableStateOf(
-                            createDummyEvent(targetDateTime)
-//                            createDummyEvents()
+//                            createDummyEvent(targetDateTime)
+                            createDummyEvents()
                         )
                     }
                     DailySchedule(
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         onFinishDragEvent = { event, targetTime ->
                             list = list.map {
-                                if (event.id == it.id) {
+                                if (event == it) {
                                     it.copy(
                                         startTime = targetTime.startTime,
                                         endTime = targetTime.endTime
@@ -73,10 +73,11 @@ data class CalendarEvent(
 
 fun createDummyEvents(): List<CalendarEvent> {
     return List(365) {
-        createDummyEvent(LocalDateTime.now().plusDays(it.toLong()))
+        createDummyEvent(LocalDateTime.now().plusDays(it.toLong()), it)
     }.flatten()
 }
-fun createDummyEvent(targetDateTime: LocalDateTime): List<CalendarEvent> {
+
+fun createDummyEvent(targetDateTime: LocalDateTime, index: Int = 0): List<CalendarEvent> {
     return listOf(
         CalendarEvent(
             id = EventId("0"),

@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -53,19 +54,30 @@ fun DailySchedule(
     val targetHoursCount = 24 * daysCount
     val overlappingOffsetX = 40.dp // 重なりがある場合にどれくらいずらすか
 
-    Column(modifier = Modifier.fillMaxHeight()) {
-        Text(text = "hoge")
+    val density = LocalDensity.current
+
+    var tmpTimeoffsetY = 0
+    val timeLabelYPositionMap = mutableMapOf<LocalDateTime, Int>()
+    val showedTimeLabel = mutableSetOf<LocalDateTime>()
+
+    repeat(targetHoursCount) { i ->
+        val dateTime = LocalDateTime.of(
+            targetDate.year,
+            targetDate.month,
+            targetDate.dayOfMonth,
+            0,
+            0
+        ).plusHours(i.toLong())
+        timeLabelYPositionMap[dateTime] = tmpTimeoffsetY
+        tmpTimeoffsetY += with(density) { 60 * minuteHeight.roundToPx() }
+        // TODO 画面外を省く
+        println("hoge add: $dateTime")
+        showedTimeLabel.add(dateTime)
     }
 
+
     val sideBarTimeLabels = @Composable {
-        repeat(targetHoursCount) { i ->
-            val dateTime = LocalDateTime.of(
-                targetDate.year,
-                targetDate.month,
-                targetDate.dayOfMonth,
-                0,
-                0
-            ).plusHours(i.toLong())
+        showedTimeLabel.forEach { dateTime ->
             Box(
                 modifier = Modifier.timeLabelDataModifier(
                     dateTime
@@ -88,12 +100,18 @@ fun DailySchedule(
         val groupedEvent = groupOverlappingEvents(events)
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
+                if (!showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.startTime)) &&
+                    !showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.endTime))
+                ) {
+                    return@mapIndexed null
+                }
+
                 CalendarEventWithOverlappingIndex(
                     group = CalendarEventWithOverlappingIndex.Group(index, groupe.size),
                     isDragging = false,
                     event = event
                 )
-            }
+            }.filterNotNull()
         }
         mutableStateOf(
             eventsWithOverlappingIndex
@@ -169,8 +187,6 @@ fun DailySchedule(
 
         println("saiki measure 呼ばれすぎてない？")
         val totalHeight = hourHeightPx * timeLabelMeasureables.size
-        var offsetY = 0
-        val timeLabelYPositionMap = mutableMapOf<LocalDateTime, Int>()
         var labelMaxWidth = 0
 
         val placeablesLine = backGroundLineMeasureables.map {
@@ -180,8 +196,6 @@ fun DailySchedule(
 
         val placablesTimeLabelWithDate = timeLabelMeasureables.map { measurable ->
             val localDateTime = measurable.parentData as LocalDateTime
-            timeLabelYPositionMap[localDateTime] = offsetY
-            offsetY += hourHeightPx
 
             val placeable = measurable.measure(
                 constraints
@@ -200,6 +214,7 @@ fun DailySchedule(
             println("saiki ====================================")
             println("saiki eventStartTime: ${event.event.startTime}")
             println("saiki eventEndTime: ${event.event.endTime}")
+            println("saiki eventGroup: ${event.group}")
             println("saiki eventHeight: $eventHeight")
             println("saiki eventDurationMinutes: $eventDurationMinutes")
             println("saiki =======================================")
@@ -411,8 +426,6 @@ private fun createTimeText(startTime: LocalDateTime, endTime: LocalDateTime) =
     }"
 
 fun groupOverlappingEvents(events: List<PrimitiveCalenderEvent>): List<List<PrimitiveCalenderEvent>> {
-    if (events.isEmpty()) return emptyList()
-
     // イベントを開始時間でソートする
     val sortedEvents = events.sortedBy { it.startTime }
 
@@ -437,6 +450,7 @@ fun groupOverlappingEvents(events: List<PrimitiveCalenderEvent>): List<List<Prim
 
     // 最後のグループを追加
     groupedEvents.add(currentGroup)
+
 
     return groupedEvents
 }
