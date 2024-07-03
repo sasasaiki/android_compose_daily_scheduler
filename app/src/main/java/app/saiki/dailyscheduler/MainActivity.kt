@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                     DailySchedule(
                         targetDate = targetDateTime,
                         events = list,
-                        daysCount = 1,
+                        daysCount = 365,
                         modifier = Modifier.padding(innerPadding),
                         onFinishDragEvent = { event, targetTime ->
                             list = list.map {
