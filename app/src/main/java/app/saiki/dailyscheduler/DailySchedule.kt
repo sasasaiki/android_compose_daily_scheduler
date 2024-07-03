@@ -80,9 +80,6 @@ fun DailySchedule(
 
 
     repeat(targetHoursCount) { i ->
-        if (i < visibleItemStartIndex.value || i > visibleItemStartIndex.value + viewItemCount.value) {
-            return@repeat
-        }
         val dateTime = LocalDateTime.of(
             targetDate.year,
             targetDate.month,
@@ -92,7 +89,6 @@ fun DailySchedule(
         ).plusHours(i.toLong())
         timeLabelYPositionMap[dateTime] = i * hourHeightPx
 
-        // TODO 画面外を省く
         showedTimeLabel.add(dateTime)
     }
 
@@ -116,16 +112,16 @@ fun DailySchedule(
     }
 
     println("showedTimeLabel: $showedTimeLabel")
-    var eventsWithOverlappingIndex by remember(events,showedTimeLabel) {
+    var eventsWithOverlappingIndex by remember(events, showedTimeLabel) {
         println("saiki rememberの中動くよね？")
         val groupedEvent = groupOverlappingEvents(events)
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
-                if (!showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.startTime)) &&
-                    !showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.endTime))
-                ) {
-                    return@mapIndexed null
-                }
+//                if (!showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.startTime)) &&
+//                    !showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.endTime))
+//                ) {
+//                    return@mapIndexed null
+//                }
 
                 CalendarEventWithOverlappingIndex(
                     group = CalendarEventWithOverlappingIndex.Group(index, groupe.size),
@@ -184,12 +180,11 @@ fun DailySchedule(
     }
 
     val backGroundLines = @Composable {
-        showedTimeLabel.forEach {
+        repeat(20) { // TODO適切なサイズに
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    .timeLabelDataModifier(it)
             )
         }
     }
@@ -203,7 +198,7 @@ fun DailySchedule(
         modifier = modifier
             .fillMaxHeight()
             .verticalScroll(state = scrollState)
-            .background(MaterialTheme.colorScheme.surface),
+            .background(MaterialTheme.colorScheme.surface)
     ) { (backGroundLineMeasureables, timeLabelMeasureables, eventMeasureables), constraints ->
         println("saiki measure 呼ばれすぎてない？")
         val totalHeight = hourHeightPx * targetHoursCount
@@ -214,7 +209,11 @@ fun DailySchedule(
             placeable
         }
 
-        val placablesTimeLabelWithDate = timeLabelMeasureables.map { measurable ->
+        val layoutTimes = mutableSetOf<LocalDateTime>()
+        val placablesTimeLabelWithDate = timeLabelMeasureables.mapIndexed { i, measurable ->
+            if (i < visibleItemStartIndex.value || i > visibleItemStartIndex.value + viewItemCount.value) {
+                return@mapIndexed null
+            }
             val localDateTime = measurable.parentData as LocalDateTime
 
             val placeable = measurable.measure(
@@ -222,12 +221,20 @@ fun DailySchedule(
             )
 
             labelMaxWidth = maxOf(labelMaxWidth, placeable.width)
+            layoutTimes.add(localDateTime)
 
             localDateTime to placeable
-        }
-//        println("saiki ----------------------------------------")
+        }.filterNotNull()
+        println("saiki ----------------------------------------")
         val placeablesWithEvents = eventMeasureables.map { measurable ->
             val event = measurable.parentData as CalendarEventWithOverlappingIndex
+            if (!layoutTimes.contains(getZeroMinuteLocalDateTime(event.event.startTime)) &&
+                !layoutTimes.contains(getZeroMinuteLocalDateTime(event.event.endTime))
+            ) {
+                return@map null
+            }
+
+
             val eventDurationMinutes =
                 ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
             val eventHeight = (eventDurationMinutes * minuteHeight.roundToPx()).toInt()
@@ -247,7 +254,8 @@ fun DailySchedule(
             )
             println("saiki placeable.height: ${placeable.height}")
             Pair(placeable, event)
-        }
+        }.filterNotNull()
+
         layout(constraints.maxWidth, totalHeight) {
             placablesTimeLabelWithDate.forEachIndexed { index, (dateTime, placeable) ->
                 val offSetY = timeLabelYPositionMap[dateTime] ?: 0
