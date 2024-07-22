@@ -108,10 +108,7 @@ fun DailySchedule(
         }
     }
 
-    var currentDraggingEvent: PrimitiveCalenderEvent? by remember {
-        mutableStateOf(null)
-    }
-    var yOffset: Float by remember {
+    var draggingItemYOffset: Float by remember {
         mutableFloatStateOf(0f)
     }
 
@@ -147,10 +144,9 @@ fun DailySchedule(
                     .calenderEventModifier(wrappedEvent)
                     .draggable(
                         state = rememberDraggableState { delta ->
-                            yOffset += delta
+                            draggingItemYOffset += delta
                         },
                         onDragStarted = {
-                            currentDraggingEvent = wrappedEvent.event
                             eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
                                 if (it.event == wrappedEvent.event) {
                                     println("saiki onDragStopped and set true")
@@ -161,8 +157,7 @@ fun DailySchedule(
                             }
                         },
                         onDragStopped = {
-                            currentDraggingEvent = null
-                            yOffset = 0f
+                            draggingItemYOffset = 0f
                             eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
                                 if (it.isDragging) {
                                     println("saiki onDragStopped and reset")
@@ -259,8 +254,8 @@ fun DailySchedule(
 
                 val eventY = timePosY + event.event.startTime.minute * minuteHeight.roundToPx()
 
-                val (dragOffsetY, zIndex) = if (currentDraggingEvent == event.event) {
-                    yOffset to 1f
+                val (dragOffsetY, zIndex) = if (event.isDragging) {
+                    draggingItemYOffset to 1f
                 } else {
                     0f to 0f
                 }
