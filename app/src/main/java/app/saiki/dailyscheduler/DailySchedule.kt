@@ -272,6 +272,7 @@ fun DailySchedule(
                     val duration =
                         ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
 
+                    // これを消せばドラッグ中はskipされる
                     eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
                         if (it == event) {
                             println("saiki set expectedTime in placeable")
