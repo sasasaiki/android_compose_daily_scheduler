@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -53,16 +54,15 @@ fun DailySchedule(
     val minuteHeight = 2.dp
 //    val hourHeight = minuteHeight*60 これをやるとroundToPixelした時にずれる
     val density = LocalDensity.current
-
     val hourHeightPx = with(density) {
         minuteHeight.roundToPx() * 60
     }
+
     val targetHoursCount = 24 * daysCount
     val overlappingOffsetX = 40.dp // 重なりがある場合にどれくらいずらすか
 
 
     val timeLabelYPositionMap = mutableMapOf<LocalDateTime, Int>()
-    val showedTimeLabel = mutableSetOf<LocalDateTime>()
 
     val scrollState = rememberScrollState()
 
@@ -78,23 +78,18 @@ fun DailySchedule(
         }
     }
 
-
-    repeat(targetHoursCount) { i ->
-        if (i < visibleItemStartIndex.value || i > visibleItemStartIndex.value + viewItemCount.value) {
-            return@repeat
+    val showedTimeLabel: Set<LocalDateTime> =
+        remember(visibleItemStartIndex.value, visibleItemStartIndex.value, viewItemCount.value) {
+            createShouldShowTimeLabelSet(
+                targetHoursCount,
+                visibleItemStartIndex,
+                viewItemCount,
+                targetDate,
+                timeLabelYPositionMap,
+                hourHeightPx
+            )
         }
-        val dateTime = LocalDateTime.of(
-            targetDate.year,
-            targetDate.month,
-            targetDate.dayOfMonth,
-            0,
-            0
-        ).plusHours(i.toLong())
-        timeLabelYPositionMap[dateTime] = i * hourHeightPx
 
-        // TODO 画面外を省く
-        showedTimeLabel.add(dateTime)
-    }
 
     val sideBarTimeLabels = @Composable {
         showedTimeLabel.forEach { dateTime ->
@@ -113,11 +108,12 @@ fun DailySchedule(
     }
 
     println("showedTimeLabel: $showedTimeLabel")
-    var eventsWithOverlappingIndex by remember(events,showedTimeLabel) {
+    var wrapedEvents by remember(events, showedTimeLabel) {
         println("saiki rememberの中動くよね？")
         val groupedEvent = groupOverlappingEvents(events)
         val eventsWithOverlappingIndex = groupedEvent.flatMap { groupe ->
             groupe.mapIndexed { index, event ->
+                // ここのロジック間も見ないと行けなさそう
                 if (!showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.startTime)) &&
                     !showedTimeLabel.contains(getZeroMinuteLocalDateTime(event.endTime))
                 ) {
@@ -138,7 +134,7 @@ fun DailySchedule(
 
     val calenderEvents = @Composable {
 
-        eventsWithOverlappingIndex.forEach { wrappedEvent ->
+        wrapedEvents.forEach { wrappedEvent ->
             Box(
                 modifier = Modifier
                     .calenderEventModifier(wrappedEvent)
@@ -147,9 +143,8 @@ fun DailySchedule(
                             draggingItemYOffset += delta
                         },
                         onDragStarted = {
-                            eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                            wrapedEvents = wrapedEvents.map {
                                 if (it.event == wrappedEvent.event) {
-                                    println("saiki onDragStopped and set true")
                                     it.copy(isDragging = true)
                                 } else {
                                     it
@@ -158,9 +153,8 @@ fun DailySchedule(
                         },
                         onDragStopped = {
                             draggingItemYOffset = 0f
-                            eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                            wrapedEvents = wrapedEvents.map {
                                 if (it.isDragging) {
-                                    println("saiki onDragStopped and reset")
                                     it.copy(isDragging = false, expectedTime = null)
                                 } else {
                                     it
@@ -225,13 +219,7 @@ fun DailySchedule(
             val eventDurationMinutes =
                 ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
             val eventHeight = (eventDurationMinutes * minuteHeight.roundToPx()).toInt()
-//            println("saiki ====================================")
-//            println("saiki eventStartTime: ${event.event.startTime}")
-//            println("saiki eventEndTime: ${event.event.endTime}")
-//            println("saiki eventGroup: ${event.group}")
-//            println("saiki eventHeight: $eventHeight")
-//            println("saiki eventDurationMinutes: $eventDurationMinutes")
-//            println("saiki =======================================")
+
             val placeable = measurable.measure(
                 constraints.copy(
                     maxWidth = constraints.maxWidth - labelMaxWidth - overlappingOffsetX.roundToPx() * event.group.index - (event.group.size - 1 - event.group.index) * overlappingOffsetX.roundToPx(),
@@ -273,7 +261,7 @@ fun DailySchedule(
                         ChronoUnit.MINUTES.between(event.event.startTime, event.event.endTime)
 
                     // これを消せばドラッグ中はskipされる
-                    eventsWithOverlappingIndex = eventsWithOverlappingIndex.map {
+                    wrapedEvents = wrapedEvents.map {
                         if (it == event) {
                             println("saiki set expectedTime in placeable")
                             it.copy(
@@ -302,6 +290,33 @@ fun DailySchedule(
             }
         }
     }
+}
+
+private fun createShouldShowTimeLabelSet(
+    targetHoursCount: Int,
+    visibleItemStartIndex: State<Int>,
+    viewItemCount: State<Int>,
+    targetDate: LocalDateTime,
+    timeLabelYPositionMap: MutableMap<LocalDateTime, Int>,
+    hourHeightPx: Int
+): Set<LocalDateTime> {
+    val mutableSet = mutableSetOf<LocalDateTime>()
+    repeat(targetHoursCount) { i ->
+        if (i < visibleItemStartIndex.value || i > visibleItemStartIndex.value + viewItemCount.value) {
+            return@repeat
+        }
+        val dateTime = LocalDateTime.of(
+            targetDate.year,
+            targetDate.month,
+            targetDate.dayOfMonth,
+            0,
+            0
+        ).plusHours(i.toLong())
+        timeLabelYPositionMap[dateTime] = i * hourHeightPx
+
+        mutableSet.add(dateTime)
+    }
+    return mutableSet.toSet()
 }
 
 private fun getZeroMinuteLocalDateTime(time: LocalDateTime): LocalDateTime =
