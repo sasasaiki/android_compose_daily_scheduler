@@ -35,11 +35,6 @@ fun DailySchedule(
     }
     val hourHeightPx = minuteHeightPx * 60
 
-
-    Column(modifier = Modifier.fillMaxHeight()) {
-        Text(text = "hoge")
-    }
-
     val now = LocalDateTime.now()
     val sideBarTimeLabels = @Composable {
         repeat(24) { i ->
@@ -50,7 +45,7 @@ fun DailySchedule(
 
     Layout(
         content = sideBarTimeLabels,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxHeight()
             .verticalScroll(state = rememberScrollState()),
         measurePolicy = { timeLabelMeasureables, constraints ->
@@ -135,11 +130,11 @@ fun StandardTimeLabel(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        modifier = Modifier
+        modifier = Modifier,
 //            .fillMaxHeight()
 //            .fillMaxWidth()
 //            .padding(4.dp)
-            .background(Color.Cyan),
+//            .background(Color.Cyan),
         text = time.format(HourLabelFormatter),
     )
 }
