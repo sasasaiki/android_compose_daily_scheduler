@@ -3,6 +3,7 @@ package app.saiki.dailyscheduler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,19 +13,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @Composable
 fun DailySchedule(
     modifier: Modifier = Modifier,
+    timeLabel: @Composable (LocalDateTime) -> Unit = { StandardTimeLabel(time = it) },
     events: List<CalendarEvent>
 ) {
-    val hourHeight = 60.dp
+    val density = LocalDensity.current
+    val minuteHeightDp = 2.dp
+    val minuteHeightPx = with(density) {
+        minuteHeightDp.roundToPx()
+    }
+    val hourHeightPx = minuteHeightPx * 60
 
 
     Column(modifier = Modifier.fillMaxHeight()) {
@@ -34,60 +43,60 @@ fun DailySchedule(
     val now = LocalDateTime.now()
     val sideBarTimeLabels = @Composable {
         repeat(24) { i ->
-            SidebarTimeLabel(LocalDateTime.of(now.year, now.month, now.dayOfMonth, i, 0))
+            timeLabel(LocalDateTime.of(now.year, now.month, now.dayOfMonth, i, 0))
         }
-    }
-    val calenderEvents = @Composable {
-        events.sortedBy { it.startTime }.forEach { event ->
-            EventItem(event = event)
-        }
+
     }
 
     Layout(
-        contents = listOf(
-            sideBarTimeLabels,
-            calenderEvents,
-        ),
-        modifier = modifier
+        content = sideBarTimeLabels,
+        modifier = Modifier
             .fillMaxHeight()
-            .verticalScroll(state = rememberScrollState())
-            .background(MaterialTheme.colorScheme.secondary),
-    ) { (timeLabelMeasureables, eventMeasureables), constraints ->
-        val totalHeight = hourHeight.roundToPx() * 24
-        val placablesTimeLabel = timeLabelMeasureables.map { measurable ->
-            measurable.measure(
-                constraints.copy(
-                    minHeight = hourHeight.roundToPx(),
-                    maxHeight = hourHeight.roundToPx()
+            .verticalScroll(state = rememberScrollState()),
+        measurePolicy = { timeLabelMeasureables, constraints ->
+            val totalHeight = hourHeightPx * timeLabelMeasureables.size
+
+            println("hogehoge $constraints")
+            val timeLabelPlacables: List<Placeable> = timeLabelMeasureables.map { measurable ->
+                measurable.measure(
+                    constraints.copy(
+                        minHeight = 0,
+                        maxHeight = hourHeightPx
+                    )
                 )
-            )
-        }
-//
-//        val placeablesWithEvents = measureables.map { measurable ->
-//            val event = measurable.parentData as Event
-//            val eventDurationMinutes = ChronoUnit.MINUTES.between(event.start, event.end)
-//            val eventHeight = ((eventDurationMinutes / 60f) * hourHeight.toPx()).roundToInt()
-//            val placeable = measurable.measure(
-//                constraints.copy(
-//                    minHeight = eventHeight,
-//                    maxHeight = eventHeight
-//                )
-//            )
-//            Pair(placeable, event)
-//        }
-        layout(constraints.maxWidth, totalHeight) {
-            placablesTimeLabel.forEachIndexed { index, placeable ->
-                placeable.place(0, hourHeight.roundToPx() * index)
             }
-//            placeablesWithEvents.forEach { (placeable, event) ->
-//                val eventOffsetMinutes =
-//                    ChronoUnit.MINUTES.between(LocalTime.MIN, event.start.toLocalTime())
-//                val eventY = ((eventOffsetMinutes / 60f) * hourHeight.toPx()).roundToInt()
-//                placeable.place(0, eventY)
-//            }
+
+            timeLabelPlacables.forEach {
+                println("hogehoge height ${it.height} measruedheight${it.measuredHeight}")
+            }
+
+
+            layout(constraints.maxWidth, totalHeight) {
+                timeLabelPlacables.forEachIndexed { index, placeable ->
+                    placeable.place(
+                        x = 0,
+                        y = hourHeightPx * index,
+                        zIndex = 0f
+                    )
+                }
+            }
         }
-    }
+
+    )
 }
+
+// なし
+//  hogehoge Constraints(minWidth = 0, maxWidth = 1080, minHeight = 0, maxHeight = 2400)
+
+//.verticalScroll(state = rememberScrollState()),
+// hogehoge Constraints(minWidth = 0, maxWidth = 1080, minHeight = 0, maxHeight = Infinity)
+
+// .fillMaxHeight()
+//  hogehoge Constraints(minWidth = 0, maxWidth = 1080, minHeight = 2400, maxHeight = 2400)
+
+//.fillMaxHeight()
+//.verticalScroll(state = rememberScrollState()),
+//hogehoge Constraints(minWidth = 0, maxWidth = 1080, minHeight = 2400, maxHeight = Infinity)
 
 
 @Composable
@@ -121,12 +130,16 @@ fun EventItem(
 }
 
 @Composable
-fun SidebarTimeLabel(
+fun StandardTimeLabel(
     time: LocalDateTime,
     modifier: Modifier = Modifier,
 ) {
     Text(
-        modifier = Modifier.padding(4.dp),
+        modifier = Modifier
+//            .fillMaxHeight()
+//            .fillMaxWidth()
+//            .padding(4.dp)
+            .background(Color.Cyan),
         text = time.format(HourLabelFormatter),
     )
 }
@@ -170,5 +183,6 @@ private fun PreviewEvent() {
 @Preview(showBackground = true)
 @Composable
 private fun PreviewTimeLabel() {
-    SidebarTimeLabel(LocalDateTime.now())
+
+    StandardTimeLabel(LocalDateTime.now())
 }
