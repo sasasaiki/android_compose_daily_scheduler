@@ -2,6 +2,9 @@ package app.saiki.dailyscheduler
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,6 +19,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
@@ -33,8 +41,9 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun DailySchedule(
     modifier: Modifier = Modifier,
-    timeLabel: @Composable (LocalDateTime) -> Unit = { StandardTimeLabel(time = it) },
     events: List<CalendarEvent>,
+    onFinishDragEvent: (CalendarEvent, DragState.Dragging) -> Unit,
+    timeLabel: @Composable (LocalDateTime) -> Unit = { StandardTimeLabel(time = it) },
     eventContent: @Composable (WrappedCalendarEvent) -> Unit = { EventItem(event = it) },
 ) {
     val density = LocalDensity.current
@@ -68,18 +77,61 @@ fun DailySchedule(
         }
     }
 
-    val eventContents = @Composable {
-        groupOverlappingEvents(events).forEach { group ->
-            group.forEachIndexed { index, event ->
-                val wrappedEvent = WrappedCalendarEvent(
-                    group = Group(index = index, size = group.size),
-                    data = event
-                )
-                Box(
-                    modifier = Modifier.calenderEventModifier(wrappedEvent)
-                ) {
-                    eventContent(wrappedEvent)
+    var wrappedEvents by remember(events) {
+        println("event$events")
+        mutableStateOf(
+            groupOverlappingEvents(events).flatMap { group ->
+                group.mapIndexed { index, event ->
+                    WrappedCalendarEvent(
+                        group = Group(index = index, size = group.size),
+                        data = event
+                    )
                 }
+            }
+        )
+    }
+
+    var draggingItemYOffset by remember {
+        mutableFloatStateOf(0f)
+    }
+    val eventContents = @Composable {
+        wrappedEvents.forEach { wrappedEvent ->
+            Box(
+                modifier = Modifier
+                    .calenderEventModifier(wrappedEvent)
+                    .draggable(
+                        state = rememberDraggableState { delta ->
+                            draggingItemYOffset += delta
+                        },
+                        onDragStarted = {
+                            wrappedEvents = wrappedEvents.map {
+                                if (it.data == wrappedEvent.data) {
+                                    it.copy(
+                                        dragState = DragState.Dragging(
+                                            startTime = it.data.startTime,
+                                            endTime = it.data.endTime
+                                        )
+                                    )
+                                } else {
+                                    it
+                                }
+                            }
+                        },
+                        onDragStopped = {
+                            draggingItemYOffset = 0f
+                            wrappedEvents = wrappedEvents.map {
+                                if (it.dragState is DragState.Dragging) {
+                                    onFinishDragEvent(it.data, it.dragState)
+                                    it.copy(dragState = DragState.None)
+                                } else {
+                                    it
+                                }
+                            }
+                        },
+                        orientation = Orientation.Vertical
+                    )
+            ) {
+                eventContent(wrappedEvent)
             }
         }
     }
@@ -122,8 +174,7 @@ fun DailySchedule(
                 val eventDurationMinutes =
                     ChronoUnit.MINUTES.between(event.data.startTime, event.data.endTime)
                 val eventHeight = (eventDurationMinutes * minuteHeightPx).toInt()
-                val eventWidth = (constraints.maxWidth - labelMaxWidth)  / event.group.size
-
+                val eventWidth = (constraints.maxWidth - labelMaxWidth) / event.group.size
                 measurable.measure(
                     constraints.copy(
                         minWidth = eventWidth,
@@ -150,15 +201,68 @@ fun DailySchedule(
                 }
 
                 eventPlaceablesWithEvent.forEach { (placeable, event) ->
+                    val (y, z) = if (event.dragState is DragState.None) {
+                        dataTimeYMap.getOrDefault(
+                            event.data.startTime.getZeroMinuteLocalDateTime(),
+                            0
+                        ) + event.data.startTime.minute * minuteHeightPx to 0f
+                    } else {
+                        val offsetMinute = draggingItemYOffset / (minuteHeightPx.toFloat())
+                        val draggingStartTime =
+                            event.data.startTime.plusMinutes(offsetMinute.toLong())
+                        val targetHourY = dataTimeYMap.getOrDefault(
+                            draggingStartTime.getZeroMinuteLocalDateTime(),
+                            0
+                        )
+                        val closestTargetMinute = findClosestFiveMinute(draggingStartTime)
+
+                        wrappedEvents = wrappedEvents.map {
+                            if (it.data == event.data) {
+                                val targetStartTime =
+                                    draggingStartTime
+                                        .getZeroMinuteLocalDateTime()
+                                        .plusMinutes(closestTargetMinute.toLong())
+                                val targetEndTime = targetStartTime.plusMinutes(
+                                    ChronoUnit.MINUTES.between(
+                                        event.data.startTime,
+                                        event.data.endTime
+                                    )
+                                )
+                                it.copy(
+                                    dragState = DragState.Dragging(
+                                        startTime = targetStartTime,
+                                        endTime = targetEndTime,
+                                    )
+                                )
+                            } else {
+                                it
+                            }
+                        }
+
+                        targetHourY + closestTargetMinute * minuteHeightPx to 1f
+                    }
                     placeable.place(
                         x = labelMaxWidth + (placeable.width * event.group.index),
-                        y = dataTimeYMap[event.data.startTime.getZeroMinuteLocalDateTime()] ?: 0,
+                        y = y,
+                        zIndex = z,
                     )
                 }
             }
         }
 
     )
+}
+
+
+private fun findClosestFiveMinute(dateTime: LocalDateTime): Int {
+    val minute = dateTime.minute
+    val tickMinutes = 15
+    val remainder = minute % tickMinutes
+    return if (remainder < tickMinutes / 2 + 1) {
+        minute - remainder
+    } else {
+        minute + (tickMinutes - remainder)
+    }
 }
 
 private fun LocalDateTime.getZeroMinuteLocalDateTime(): LocalDateTime =
@@ -238,16 +342,26 @@ fun EventItem(
             .cardColors()
             .copy(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = if (event.dragState is DragState.Dragging)
+                    MaterialTheme.colorScheme.primary.copy(
+                        alpha = 0.5f
+                    )
+                else
+                    MaterialTheme.colorScheme.primary
             ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)),
     ) {
         Column(modifier = modifier.padding(8.dp)) {
+            val (startTime, endTime) = if (event.dragState is DragState.Dragging) {
+                event.dragState.startTime to event.dragState.endTime
+            } else {
+                event.data.startTime to event.data.endTime
+            }
             Text(
                 text = "${
-                    event.data.startTime.format(EventTimeFormatter)
+                    startTime.format(EventTimeFormatter)
                 } - ${
-                    event.data.endTime.format(EventTimeFormatter)
+                    endTime.format(EventTimeFormatter)
                 }",
                 style = MaterialTheme.typography.labelSmall,
             )
@@ -280,6 +394,7 @@ private val HourLabelFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 data class WrappedCalendarEvent(
     val group: Group,
+    val dragState: DragState = DragState.None,
     val data: CalendarEvent
 ) {
     data class CalendarEvent(
@@ -293,23 +408,31 @@ data class WrappedCalendarEvent(
         val size: Int,
         val index: Int,
     )
+
+    sealed class DragState {
+        data object None : DragState()
+        data class Dragging(
+            val startTime: LocalDateTime,
+            val endTime: LocalDateTime
+        ) : DragState()
+    }
 }
 
-@Preview
-@Composable
-private fun PreviewDaily() {
-    DailySchedule(
-        events = listOf(
-            CalendarEvent(
-                id = "",
-                title = "Event Title",
-                startTime = LocalDateTime.now(),
-                endTime = LocalDateTime.now().plusHours(1)
-            )
-        )
-
-    )
-}
+//@Preview
+//@Composable
+//private fun PreviewDaily() {
+//    DailySchedule(
+//        events = listOf(
+//            CalendarEvent(
+//                id = "",
+//                title = "Event Title",
+//                startTime = LocalDateTime.now(),
+//                endTime = LocalDateTime.now().plusHours(1)
+//            )
+//        )
+//
+//    )
+//}
 
 @Preview
 @Composable

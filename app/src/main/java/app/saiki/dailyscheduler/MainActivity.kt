@@ -13,6 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -26,12 +30,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
+
+            var list by remember {
+                mutableStateOf(createDummyEvent(LocalDateTime.now()))
+            }
             DailySchedulerComposeTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     DailySchedule(
-                        events = createDummyEvent(LocalDateTime.now()),
-                        modifier = Modifier.padding(innerPadding)
+                        events = list,
+                        modifier = Modifier.padding(innerPadding),
+                        onFinishDragEvent = { event, targetTime ->
+                            list = list.map {
+                                if (event == it) {
+                                    it.copy(
+                                        startTime = targetTime.startTime,
+                                        endTime = targetTime.endTime
+                                    )
+                                } else {
+                                    it
+                                }
+                            }
+                        },
                     )
 //                    SampleModifierLayout("Android", modifier = Modifier.padding(innerPadding))
 //                    SampleMeasuredHeight(modifier = Modifier.padding(innerPadding))
