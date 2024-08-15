@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,9 +34,11 @@ import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.saiki.dailyscheduler.WrappedCalendarEvent.*
+import java.lang.Integer.max
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -52,22 +57,44 @@ fun DailySchedule(
         minuteHeightDp.roundToPx()
     }
     val hourHeightPx = minuteHeightPx * 60
+    val timeLabelCount = 24 * 365
 
-    val now = LocalDateTime.now()
-    val timeLabelCount = 24
+    val scrollState = rememberScrollState()
+
+    val visibleItemCount by remember {
+        derivedStateOf {
+            scrollState.viewportSize / (hourHeightPx) + 12
+        }
+    }
+
+    val visibleItemStartIndex by remember {
+        derivedStateOf {
+            // Align the start position of the Event, so leave some margin in front.
+            max(0, (scrollState.value / hourHeightPx) - 10)
+        }
+    }
+
+    val visibleTimeLabel: Set<LocalDateTime> =
+        remember(visibleItemStartIndex, visibleItemCount) {
+            createShouldShowTimeLabelSet(
+                visibleItemStartIndex,
+                visibleItemCount,
+            )
+        }
+
+
     val sideBarTimeLabels = @Composable {
-        repeat(timeLabelCount) { i ->
-            val dateTime = LocalDateTime.of(now.year, now.month, now.dayOfMonth, i, 0)
+        visibleTimeLabel.forEach {
             Box(
-                modifier = Modifier.timeLabelDataModifier(dateTime)
+                modifier = Modifier.timeLabelDataModifier(it)
             ) {
-                timeLabel(dateTime)
+                timeLabel(it)
             }
         }
     }
 
     val backGroundLines = @Composable {
-        repeat(timeLabelCount) { i ->
+        repeat(visibleTimeLabel.size) { i ->
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -77,17 +104,22 @@ fun DailySchedule(
         }
     }
 
-    var wrappedEvents by remember(events) {
-        println("event$events")
+    var wrappedEvents by remember(events, visibleTimeLabel) {
         mutableStateOf(
             groupOverlappingEvents(events).flatMap { group ->
                 group.mapIndexed { index, event ->
+                    // Not considering very long events
+                    if (!visibleTimeLabel.contains(event.startTime.getZeroMinuteLocalDateTime()) &&
+                        !visibleTimeLabel.contains(event.endTime.getZeroMinuteLocalDateTime())
+                    ) {
+                        return@mapIndexed null
+                    }
                     WrappedCalendarEvent(
                         group = Group(index = index, size = group.size),
                         data = event
                     )
                 }
-            }
+            }.filterNotNull()
         )
     }
 
@@ -143,9 +175,10 @@ fun DailySchedule(
         ),
         modifier = modifier
             .fillMaxHeight()
-            .verticalScroll(state = rememberScrollState()),
+            .verticalScroll(state = scrollState),
         measurePolicy = { (timeLabelMeasureables, backGroundLinesMeasureables, eventMeasureables), constraints ->
-            val totalHeight = hourHeightPx * timeLabelMeasureables.size
+//            val totalHeight = hourHeightPx * timeLabelMeasureables.size
+            val totalHeight = hourHeightPx * timeLabelCount
 
             var labelMaxWidth = 0
             val timeLabelPlacablesWithDataTime: List<Pair<Placeable, LocalDateTime>> =
@@ -185,10 +218,14 @@ fun DailySchedule(
                 ) to event
             }
 
-            layout(constraints.maxWidth, totalHeight) {
+            layout(
+                width = constraints.maxWidth,
+                height = totalHeight
+            ) {
                 val dataTimeYMap = hashMapOf<LocalDateTime, Int>()
                 timeLabelPlacablesWithDataTime.forEachIndexed { index, (placeable, dateTime) ->
-                    val y = hourHeightPx * index
+//                    val y = hourHeightPx * index
+                    val y = hourHeightPx * (index + visibleItemStartIndex)
                     placeable.place(
                         x = 0,
                         y = y,
@@ -253,6 +290,19 @@ fun DailySchedule(
     )
 }
 
+
+private fun createShouldShowTimeLabelSet(
+    visibleItemStartIndex: Int,
+    viewItemCount: Int,
+): Set<LocalDateTime> {
+    val mutableSet = mutableSetOf<LocalDateTime>()
+    for (i in visibleItemStartIndex..visibleItemStartIndex + viewItemCount) {
+        val dateTime = starTime.plusHours(i.toLong())
+
+        mutableSet.add(dateTime)
+    }
+    return mutableSet.toSet()
+}
 
 private fun findClosestFiveMinute(dateTime: LocalDateTime): Int {
     val minute = dateTime.minute
@@ -379,14 +429,18 @@ fun StandardTimeLabel(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        modifier = Modifier
+        modifier = Modifier,
 //            .fillMaxHeight()
 //            .fillMaxWidth()
 //            .padding(4.dp)
-            .background(Color.Cyan),
+//            .background(Color.Cyan),
         text = time.format(HourLabelFormatter),
     )
 }
+
+val now = LocalDateTime.now()
+val starTime = LocalDateTime.of(now.year, now.month, now.dayOfMonth, 0, 0)
+
 
 private val EventTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val HourLabelFormatter = DateTimeFormatter.ofPattern("HH:mm")
