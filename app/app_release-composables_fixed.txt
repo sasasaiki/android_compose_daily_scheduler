@@ -1,0 +1,27 @@
+restartable scheme("[androidx.compose.ui.UiComposable, [androidx.compose.ui.UiComposable], [androidx.compose.ui.UiComposable]]") fun DailySchedule(
+  stable modifier: Modifier? = @static Companion
+  unstable events: List<CalendarEvent>
+  stable onFinishDragEvent: Function2<CalendarEvent, Dragging, Unit>
+  stable timeLabel: Function3<LocalDateTime, Composer, Int, Unit>? = @static ComposableSingletons$DailyScheduleKt.lambda-1
+  stable eventContent: Function3<WrappedCalendarEvent, Composer, Int, Unit>? = @static ComposableSingletons$DailyScheduleKt.lambda-2
+)
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun EventItem(
+  stable modifier: Modifier? = @static Companion
+  stable event: WrappedCalendarEvent
+)
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun StandardTimeLabel(
+  stable time: LocalDateTime
+  unused stable modifier: Modifier? = @static Companion
+)
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun PreviewEvent()
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun PreviewTimeLabel()
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun SampleModifierLayout(
+  unused stable name: String
+  stable modifier: Modifier? = @static Companion
+)
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun GreetingPreview()
+restartable skippable scheme("[0, [0]]") fun DailySchedulerComposeTheme(
+  stable darkTheme: Boolean = @dynamic isSystemInDarkTheme($composer, 0)
+  stable dynamicColor: Boolean = @static true
+  stable content: Function2<Composer, Int, Unit>
+)

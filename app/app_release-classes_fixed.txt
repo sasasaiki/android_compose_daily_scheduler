@@ -1,0 +1,32 @@
+stable class CalendarEvent {
+  stable val id: String
+  stable val title: String
+  stable val startTime: LocalDateTime
+  stable val endTime: LocalDateTime
+  <runtime stability> = Stable
+}
+stable class Group {
+  stable val size: Int
+  stable val index: Int
+  <runtime stability> = Stable
+}
+stable class None {
+  <runtime stability> = Stable
+}
+stable class Dragging {
+  stable val startTime: LocalDateTime
+  stable val endTime: LocalDateTime
+  <runtime stability> = Stable
+}
+stable class DragState {
+  <runtime stability> = Stable
+}
+stable class WrappedCalendarEvent {
+  stable val group: Group
+  stable val dragState: DragState
+  stable val data: CalendarEvent
+  <runtime stability> = Stable
+}
+stable class MainActivity {
+  <runtime stability> = Stable
+}
