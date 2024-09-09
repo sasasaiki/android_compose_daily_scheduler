@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +19,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -28,7 +26,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Placeable
@@ -37,7 +34,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import app.saiki.dailyscheduler.WrappedCalendarEvent.*
+import app.saiki.dailyscheduler.WrappedCalendarEvent.CalendarEvent
+import app.saiki.dailyscheduler.WrappedCalendarEvent.DragState
+import app.saiki.dailyscheduler.WrappedCalendarEvent.Group
 import java.lang.Integer.max
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -86,7 +85,9 @@ fun DailySchedule(
     val sideBarTimeLabels = @Composable {
         visibleTimeLabel.forEach {
             Box(
-                modifier = Modifier.timeLabelDataModifier(it)
+                modifier = Modifier
+                    .timeLabelDataModifier(it)
+                    .fillMaxHeight()
             ) {
                 timeLabel(it)
             }
@@ -167,6 +168,7 @@ fun DailySchedule(
             }
         }
     }
+
     Layout(
         contents = listOf(
             sideBarTimeLabels,
@@ -209,14 +211,13 @@ fun DailySchedule(
                 val eventHeight = (eventDurationMinutes * minuteHeightPx).toInt()
                 val eventWidth = (constraints.maxWidth - labelMaxWidth) / event.group.size
                 measurable.measure(
-                    constraints.copy(
-                        minWidth = eventWidth,
-                        maxWidth = eventWidth,
-                        minHeight = eventHeight,
-                        maxHeight = eventHeight
+                    Constraints.fixed(
+                        width = eventWidth,
+                        height = eventHeight
                     )
                 ) to event
             }
+
 
             layout(
                 width = constraints.maxWidth,
@@ -429,8 +430,8 @@ fun StandardTimeLabel(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        modifier = Modifier,
-//            .fillMaxHeight()
+        modifier = Modifier
+            .fillMaxHeight(),
 //            .fillMaxWidth()
 //            .padding(4.dp)
 //            .background(Color.Cyan),

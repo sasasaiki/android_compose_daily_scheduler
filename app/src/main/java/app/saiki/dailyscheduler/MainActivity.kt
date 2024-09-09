@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -38,7 +39,10 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(createDummyEvents())
             }
             DailySchedulerComposeTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) { innerPadding ->
                     DailySchedule(
                         events = list,
                         modifier = Modifier.padding(innerPadding),
@@ -71,11 +75,14 @@ fun SampleModifierLayout(name: String, modifier: Modifier = Modifier) {
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .layout { measurable, constraints ->
-                constraints.hasBoundedHeight
-                val placeable = measurable.measure(constraints.copy(
-                    minHeight = constraints.maxHeight,
-                    maxHeight = constraints.maxHeight,
-                ))
+//                constraints.hasBoundedHeight
+                val placeable = measurable.measure(
+                    constraints.copy(
+                        minHeight = 0,
+                        maxHeight = constraints.maxHeight,
+                    )
+                )
+
                 val width = placeable.width
                 val height = placeable.height
                 val size = maxOf(width, height)
@@ -88,6 +95,7 @@ fun SampleModifierLayout(name: String, modifier: Modifier = Modifier) {
             text = "1",
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.primary)
+                .fillMaxHeight()
         )
         Text(
             text = "22222222222",
@@ -239,24 +247,24 @@ fun createDummyEvent(targetDateTime: LocalDateTime, index: Int = 0): List<Calend
             ),
             title = "Meeting",
         ),
-            CalendarEvent(
-                id = "6",
-                startTime = LocalDateTime.of(
-                    targetDateTime.year,
-                    targetDateTime.month,
-                    targetDateTime.dayOfMonth,
-                    15,
-                    0
-                ),
-                endTime = LocalDateTime.of(
-                    targetDateTime.year,
-                    targetDateTime.month,
-                    targetDateTime.dayOfMonth,
-                    17,
-                    15
-                ),
-                title = "Meeting",
-            )
+        CalendarEvent(
+            id = "6",
+            startTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                15,
+                0
+            ),
+            endTime = LocalDateTime.of(
+                targetDateTime.year,
+                targetDateTime.month,
+                targetDateTime.dayOfMonth,
+                17,
+                15
+            ),
+            title = "Meeting",
+        )
     )
 }
 
